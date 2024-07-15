@@ -1,4 +1,7 @@
 # funaudiollm-app repo
+
+视频教程：[https://www.bilibili.com/video/BV1Fb421H7oK/](https://www.bilibili.com/video/BV1Fb421H7oK/)  
+
 Welcome to the funaudiollm-app repository! This project hosts two exciting applications leveraging advanced audio understand and speech generation models to bring your audio experiences to life:
 
 **Voice Chat** :  This application is designed to provide an interactive and natural chatting experience, making it easier to adopt sophisticated AI-driven dialogues in various settings.
@@ -28,28 +31,37 @@ git submodule update --init --recursive
 pip install -r requirements.txt
 ```
 
+### win
+
+CosyVoice Windows部署得改源码，使用[https://github.com/v3ucn/CosyVoice_For_Windows](https://github.com/v3ucn/CosyVoice_For_Windows)  
+
 ## Basic Usage
 **prepare**
 
 
-[dashscope](https://dashscope.aliyun.com/) api token.
+dashscope api密钥：[https://dashscope.console.aliyun.com/apiKey](https://dashscope.console.aliyun.com/apiKey)  
 
-[pem file](https://blog.csdn.net/liuchenbaidu/article/details/136722001)
+modelscope SDK密钥：[https://modelscope.cn/my/myaccesstoken](https://modelscope.cn/my/myaccesstoken)  
 
+不开ssl，默认注释了 [pem file](https://blog.csdn.net/liuchenbaidu/article/details/136722001)  
+
+### Win
+
+参考bat 运行
+
+### Linux
 
 **voice chat**
 
 ``` sh
-cd voice_chat
-sudo CUDA_VISIBLE_DEVICES="0" DS_API_TOKEN="YOUR-DS-API-TOKEN" python app.py >> ./log.txt
+sudo CUDA_VISIBLE_DEVICES="0" DS_API_TOKEN="YOUR-DS-API-TOKEN" python voice_chat.py >> ./log.txt
 ```
 https://YOUR-IP-ADDRESS:60001/
 
 **voice translation**
 
 ``` sh
-cd voice_translation
-sudo CUDA_VISIBLE_DEVICES="0" DS_API_TOKEN="YOUR-DS-API-TOKEN" python app.py >> ./log.txt
+sudo CUDA_VISIBLE_DEVICES="0" DS_API_TOKEN="YOUR-DS-API-TOKEN" python voice_translation.py >> ./log.txt
 ```
 https://YOUR-IP-ADDRESS:60002/
 
