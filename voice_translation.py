@@ -12,22 +12,33 @@ from uuid import uuid4
 from modelscope import HubApi
 import torchaudio
 import sys
-sys.path.insert(1, "../cosyvoice")
-sys.path.insert(1, "../sensevoice")
-sys.path.insert(1, "../cosyvoice/third_party/AcademiCodec")
-sys.path.insert(1, "../cosyvoice/third_party/Matcha-TTS")
-sys.path.insert(1, "../")
+sys.path.insert(1, "cosyvoice")
+sys.path.insert(1, "sensevoice")
+sys.path.insert(1, "cosyvoice/third_party/AcademiCodec")
+sys.path.insert(1, "cosyvoice/third_party/Matcha-TTS")
 from utils.rich_format_small import format_str_v2
 from cosyvoice.cli.cosyvoice import CosyVoice
 from cosyvoice.utils.file_utils import load_wav
 from funasr import AutoModel
 
-api = HubApi()
-MS_API_TOKEN = os.environ.get('MS_API_TOKEN')
-api.login(MS_API_TOKEN)
+# 使用的LLM类型，目前支持openai和dashscope
+LLM_TYPE = "openai"
+if LLM_TYPE == "openai":
+    from openai import OpenAI
+    # 配置你的密钥和api地址(https://api.openai.com/v1/)
+    client = OpenAI(api_key="sk-", base_url="http://127.0.0.1:11434/v1/")
+    openai_model_name = "qwen2:latest"
+elif LLM_TYPE == "dashscope":
+    # https://dashscope.console.aliyun.com/apiKey
+    DS_API_TOKEN = "sk-111111111111111111111111111111111"
+    dashscope.api_key = DS_API_TOKEN
 
-DS_API_TOKEN = os.getenv('DS_API_TOKEN')
-dashscope.api_key = DS_API_TOKEN
+if True:
+    api = HubApi()
+    # https://modelscope.cn/my/myaccesstoken
+    MS_API_TOKEN = "01702c97-111111111111111111111111"
+    api.login(MS_API_TOKEN)
+
 
 cosyvoice = CosyVoice('speech_tts/CosyVoice-300M')
 asr_model_name_or_path = "iic/SenseVoiceSmall"
@@ -94,51 +105,79 @@ def model_chat(audio, history: Optional[History]
     messages = history_to_messages(history, system)
     messages.append({'role': Role.USER, 'content': query})
     print(messages)
-    gen = Generation()
-    llm_stream = False
-    if llm_stream:
-        gen = gen.call(
-            model_name,
-            messages=messages,
-            result_format='message',  # set the result to be "message" format.
-            enable_search=False,
-            stream=llm_stream,
-        )
-    else:
-        gen = [gen.call(
-            model_name,
-            messages=messages,
-            result_format='message',  # set the result to be "message" format.
-            enable_search=False,
-            stream=llm_stream
-        )]
+
+    if LLM_TYPE == "dashscope":
+        gen = Generation()
+        llm_stream = False
+        if llm_stream:
+            gen = gen.call(
+                model_name,
+                messages=messages,
+                result_format='message',  # set the result to be "message" format.
+                enable_search=False,
+                stream=llm_stream,
+            )
+        else:
+            gen = [gen.call(
+                model_name,
+                messages=messages,
+                result_format='message',  # set the result to be "message" format.
+                enable_search=False,
+                stream=llm_stream
+            )]
+    elif LLM_TYPE == "openai":
+        llm_stream = False
+        if llm_stream:
+            gen = client.chat.completions.create(
+                model=openai_model_name,
+                messages=messages,
+                stream=llm_stream,
+            )
+        else:
+            gen = [client.chat.completions.create(
+                model=openai_model_name,
+                messages=messages,
+                stream=llm_stream,
+            )]
+
     processed_tts_text = ""
     punctuation_pattern = r'([!?;。！？])'
     for response in gen:
-        if response.status_code == HTTPStatus.OK:
-            role = response.output.choices[0].message.role
-            response = response.output.choices[0].message.content
-            print(f"response: {response}")
-            system, history = messages_to_history(messages + [{'role': role, 'content': response}])
-            # 对 processed_tts_text 进行转义处理
-            escaped_processed_tts_text = re.escape(processed_tts_text)
-            tts_text = re.sub(f"^{escaped_processed_tts_text}", "", response)
-            if re.search(punctuation_pattern, tts_text):
-                parts = re.split(punctuation_pattern, tts_text)
-                if len(parts) > 2 and parts[-1] and llm_stream: # parts[-1]为空说明句子以标点符号结束，没必要截断
-                    tts_text = "".join(parts[:-1])
-                print(f"processed_tts_text: {processed_tts_text}")
-                processed_tts_text += tts_text
-                print(f"cur_tts_text: {tts_text}")
-                # tts_generator = text_to_speech(tts_text)
-                tts_generator = text_to_speech_cross_lingual(tts_text, asr_wav_path)
-                for output_audio_path in tts_generator:
-                    yield history, output_audio_path, None
-        else:
-            raise ValueError('Request id: %s, Status code: %s, error code: %s, error message: %s' % (
-                response.request_id, response.status_code,
-                response.code, response.message
-            ))
+        if LLM_TYPE == "dashscope":
+            if response.status_code == HTTPStatus.OK:
+                role = response.output.choices[0].message.role
+                response = response.output.choices[0].message.content
+                
+            else:
+                raise ValueError('Request id: %s, Status code: %s, error code: %s, error message: %s' % (
+                    response.request_id, response.status_code,
+                    response.code, response.message
+                ))
+            
+        elif LLM_TYPE == "openai":
+            try:
+                role = response.choices[0].message.role
+                response = response.choices[0].message.content
+            except Exception as e:
+                print(e)
+                raise e
+            
+        print(f"response: {response}")
+        system, history = messages_to_history(messages + [{'role': role, 'content': response}])
+        # 对 processed_tts_text 进行转义处理
+        escaped_processed_tts_text = re.escape(processed_tts_text)
+        tts_text = re.sub(f"^{escaped_processed_tts_text}", "", response)
+        if re.search(punctuation_pattern, tts_text):
+            parts = re.split(punctuation_pattern, tts_text)
+            if len(parts) > 2 and parts[-1] and llm_stream: # parts[-1]为空说明句子以标点符号结束，没必要截断
+                tts_text = "".join(parts[:-1])
+            print(f"processed_tts_text: {processed_tts_text}")
+            processed_tts_text += tts_text
+            print(f"cur_tts_text: {tts_text}")
+            # tts_generator = text_to_speech(tts_text)
+            tts_generator = text_to_speech_cross_lingual(tts_text, asr_wav_path)
+            for output_audio_path in tts_generator:
+                yield history, output_audio_path, None
     if processed_tts_text == response:
         print("turn end")
     else:
@@ -221,5 +260,6 @@ with gr.Blocks() as demo:
 
 if __name__ == "__main__":
     demo.queue(api_open=False)
-    demo.launch(server_name='0.0.0.0', server_port=60002, ssl_certfile="../cert.pem", ssl_keyfile="../key.pem",
-                inbrowser=True, ssl_verify=False)
+    #demo.launch(server_name='0.0.0.0', server_port=60002, ssl_certfile="../cert.pem", ssl_keyfile="../key.pem",
+    #            inbrowser=True, ssl_verify=False)
+    demo.launch(server_name='0.0.0.0', server_port=60002, inbrowser=True, ssl_verify=False, share=False)
