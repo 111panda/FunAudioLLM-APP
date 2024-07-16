@@ -41,9 +41,13 @@ if True:
     api.login(MS_API_TOKEN)
 
 speaker_name = '中文女'
+# 如果想用本地模型，就改成本地路径
+# cosyvoice = CosyVoice('./modelscope/hub/speech_tts/CosyVoice-300M')
+# asr_model_name_or_path = "./modelscope/hub/iic/SenseVoiceSmall"
 cosyvoice = CosyVoice('speech_tts/CosyVoice-300M')
 asr_model_name_or_path = "iic/SenseVoiceSmall"
 sense_voice_model = AutoModel(model=asr_model_name_or_path,
+                  #model_path=asr_model_name_or_path,
                   vad_model="fsmn-vad",
                   vad_kwargs={"max_single_segment_time": 30000},
                   trust_remote_code=True, device="cuda:0", remote_code="./sensevoice/model.py")
